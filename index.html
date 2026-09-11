@@ -9,7 +9,7 @@
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
 
-  <!-- Custom Toast Notification Banner -->
+  <!-- Toast Notification -->
   <div id="toast" class="fixed top-5 right-5 z-50 hidden px-5 py-3 rounded-xl shadow-2xl text-white font-medium transition-all transform duration-300 max-w-md">
     <span id="toastMsg"></span>
   </div>
@@ -26,13 +26,13 @@
     </div>
   </nav>
 
-  <!-- Main Container -->
+  <!-- Main Content Container -->
   <main class="max-w-5xl mx-auto p-6">
 
     <!-- Auth Container -->
     <div id="authSection" class="max-w-md mx-auto mt-12 bg-slate-800 p-8 rounded-2xl shadow-xl border border-slate-700">
       
-      <!-- Role Switcher Tabs -->
+      <!-- Role Tabs -->
       <div class="flex bg-slate-900 p-1 rounded-xl mb-6">
         <button id="tabEmployee" type="button" onclick="switchAuthMode('employee')" class="flex-1 py-2 rounded-lg text-sm font-semibold transition bg-emerald-600 text-white">Employee</button>
         <button id="tabManager" type="button" onclick="switchAuthMode('manager')" class="flex-1 py-2 rounded-lg text-sm font-semibold text-slate-400 hover:text-white transition">Manager</button>
@@ -60,7 +60,6 @@
         <button type="submit" id="authSubmitBtn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-lg transition mt-4">Sign In</button>
       </form>
 
-      <!-- Toggle Registration Button -->
       <div class="text-center mt-6">
         <button id="toggleRegisterBtn" type="button" onclick="toggleRegistration()" class="text-sm text-emerald-400 hover:underline">Don't have an account? Register Now</button>
       </div>
@@ -69,7 +68,7 @@
     <!-- Employee Dashboard -->
     <div id="employeeDashboard" class="hidden space-y-8">
       
-      <!-- Dynamic Stats Summary -->
+      <!-- Stats Overview -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 text-center">
           <p class="text-slate-400 text-xs font-semibold uppercase">Available Balance</p>
@@ -89,7 +88,7 @@
         </div>
       </div>
 
-      <!-- Apply Leave Form -->
+      <!-- Leave Application Form -->
       <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
         <h3 class="text-lg font-bold text-slate-100 mb-4">Request Time Off</h3>
         <form onsubmit="submitLeaveRequest(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -111,7 +110,7 @@
         </form>
       </div>
 
-      <!-- History Table -->
+      <!-- Employee Leave History Table -->
       <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
         <h3 class="text-lg font-bold text-slate-100 mb-4">My Leave History</h3>
         <div class="overflow-x-auto">
@@ -173,23 +172,46 @@
     let authRole = 'employee';
     let isRegisterMode = false;
 
-    // Toast Helper
+    // Utility: Extract array safely regardless of backend JSON structure wrapper
+    function extractArray(data) {
+      if (Array.isArray(data)) return data;
+      if (data && typeof data === 'object') {
+        if (Array.isArray(data.requests)) return data.requests;
+        if (Array.isArray(data.leave_requests)) return data.leave_requests;
+        if (Array.isArray(data.data)) return data.data;
+        if (Array.isArray(data.items)) return data.items;
+        if (Array.isArray(data.leaves)) return data.leaves;
+        if (Array.isArray(data.result)) return data.result;
+      }
+      return [];
+    }
+
+    // Toast UI Helper
     function showToast(message, isSuccess = true) {
       const toast = document.getElementById('toast');
       const toastMsg = document.getElementById('toastMsg');
-      
       toastMsg.textContent = message;
       toast.className = `fixed top-5 right-5 z-50 px-5 py-3 rounded-xl shadow-2xl text-white font-medium transition-all transform duration-300 max-w-md ${
         isSuccess ? 'bg-emerald-600' : 'bg-rose-600'
       }`;
-      
       toast.classList.remove('hidden');
-      setTimeout(() => {
-        toast.classList.add('hidden');
-      }, 4000);
+      setTimeout(() => toast.classList.add('hidden'), 4000);
     }
 
-    // Role Switcher
+    // Initialize state from local storage on load
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedUser = localStorage.getItem('lvesync_user');
+      if (savedUser) {
+        try {
+          currentUser = JSON.parse(savedUser);
+          setupDashboard();
+        } catch (e) {
+          localStorage.removeItem('lvesync_user');
+        }
+      }
+    });
+
+    // Toggle Role
     function switchAuthMode(role) {
       authRole = role;
       const tabEmp = document.getElementById('tabEmployee');
@@ -211,10 +233,8 @@
 
     function toggleRegistration() {
       isRegisterMode = !isRegisterMode;
-      const fullNameInput = document.getElementById('fullName');
       document.getElementById('fullNameGroup').classList.toggle('hidden', !isRegisterMode);
-      fullNameInput.required = isRegisterMode;
-
+      document.getElementById('fullName').required = isRegisterMode;
       document.getElementById('toggleRegisterBtn').textContent = isRegisterMode 
         ? "Already have an account? Sign In" 
         : "Don't have an account? Register Now";
@@ -233,7 +253,7 @@
       }
     }
 
-    // Authentication Logic
+    // Authentication Handler
     async function handleAuth(event) {
       event.preventDefault();
       const email = document.getElementById('email').value.trim();
@@ -241,22 +261,9 @@
       const fullName = document.getElementById('fullName').value.trim();
 
       const endpoint = isRegisterMode ? '/register' : '/login';
-
       const payload = isRegisterMode 
-        ? { 
-            email: email, 
-            username: email, 
-            password: password, 
-            full_name: fullName || email, 
-            name: fullName || email, 
-            role: authRole 
-          }
-        : { 
-            email: email, 
-            username: email, 
-            password: password, 
-            role: authRole 
-          };
+        ? { email, username: email, password, full_name: fullName || email, name: fullName || email, role: authRole }
+        : { email, username: email, password, role: authRole };
 
       try {
         const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -269,25 +276,18 @@
 
         if (!response.ok) {
           let errorMsg = "Authentication failed";
-          if (typeof data.detail === 'string') {
-            errorMsg = data.detail;
-          } else if (Array.isArray(data.detail)) {
-            errorMsg = data.detail.map(item => {
-              const field = item.loc ? item.loc[item.loc.length - 1] : '';
-              return field ? `${field}: ${item.msg}` : (item.msg || JSON.stringify(item));
-            }).join(' | ');
-          } else if (data.detail && typeof data.detail === 'object') {
-            errorMsg = data.detail.message || JSON.stringify(data.detail);
-          } else if (data.message) {
-            errorMsg = data.message;
-          }
+          if (typeof data.detail === 'string') errorMsg = data.detail;
+          else if (Array.isArray(data.detail)) errorMsg = data.detail.map(i => i.msg || JSON.stringify(i)).join(', ');
+          else if (data.message) errorMsg = data.message;
           throw new Error(errorMsg);
         }
 
         currentUser = data.user || data;
         if (!currentUser.role) currentUser.role = authRole;
+        if (!currentUser.email) currentUser.email = email;
 
-        showToast(isRegisterMode ? "Registration successful! Logging you in..." : "Login successful!", true);
+        localStorage.setItem('lvesync_user', JSON.stringify(currentUser));
+        showToast(isRegisterMode ? "Registration successful!" : "Login successful!", true);
         setupDashboard();
       } catch (err) {
         showToast(err.message, false);
@@ -301,15 +301,18 @@
 
       if (currentUser.role === 'manager') {
         document.getElementById('managerDashboard').classList.remove('hidden');
+        document.getElementById('employeeDashboard').classList.add('hidden');
         loadManagerData();
       } else {
         document.getElementById('employeeDashboard').classList.remove('hidden');
+        document.getElementById('managerDashboard').classList.add('hidden');
         loadEmployeeData();
       }
     }
 
     function logout() {
       currentUser = null;
+      localStorage.removeItem('lvesync_user');
       document.getElementById('userHeader').classList.add('hidden');
       document.getElementById('employeeDashboard').classList.add('hidden');
       document.getElementById('managerDashboard').classList.add('hidden');
@@ -317,49 +320,75 @@
       showToast("Signed out successfully", true);
     }
 
-    // Employee Dashboard Logic
+    // Fetch Leave Requests with automatic fallback & client-side filtering
+    async function fetchAllLeaveRequests() {
+      try {
+        const res = await fetch(`${API_BASE}/leave-requests`);
+        const raw = await res.json().catch(() => ([]));
+        return extractArray(raw);
+      } catch (e) {
+        return [];
+      }
+    }
+
+    // Load Employee Leave Data
     async function loadEmployeeData() {
       try {
         const uId = currentUser.id || currentUser.user_id || currentUser._id || currentUser.email;
-        const res = await fetch(`${API_BASE}/leave-requests?user_id=${uId}`);
-        const requests = await res.json().catch(() => []);
+        const uEmail = (currentUser.email || '').toLowerCase();
+        
+        // Fetch all leave requests and filter by user identity
+        const allRequests = await fetchAllLeaveRequests();
+        const requests = allRequests.filter(req => {
+          const reqUid = String(req.user_id || req.employee_id || '').toLowerCase();
+          const reqEmail = String(req.email || req.user_email || req.employee_email || '').toLowerCase();
+          return reqUid === String(uId).toLowerCase() || reqEmail === uEmail || req.user_id == uId || req.employee_id == uId;
+        });
 
         let pending = 0, approved = 0, rejected = 0, approvedDays = 0;
         const tableBody = document.getElementById('employeeHistoryTable');
         tableBody.innerHTML = '';
 
-        if (Array.isArray(requests)) {
+        if (requests.length === 0) {
+          tableBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500">No leave requests submitted yet.</td></tr>`;
+        } else {
           requests.forEach(req => {
-            if (req.status === 'APPROVED') {
+            const status = (req.status || 'PENDING').toUpperCase();
+            const daysCount = parseInt(req.days || req.duration || 1, 10);
+
+            if (status === 'APPROVED') {
               approved++;
-              approvedDays += req.days || 1;
-            } else if (req.status === 'REJECTED') {
+              approvedDays += daysCount;
+            } else if (status === 'REJECTED') {
               rejected++;
             } else {
               pending++;
             }
 
-            const badgeColor = req.status === 'APPROVED' ? 'bg-emerald-900/50 text-emerald-400 border-emerald-700' :
-                               req.status === 'REJECTED' ? 'bg-rose-900/50 text-rose-400 border-rose-700' :
+            const badgeColor = status === 'APPROVED' ? 'bg-emerald-900/50 text-emerald-400 border-emerald-700' :
+                               status === 'REJECTED' ? 'bg-rose-900/50 text-rose-400 border-rose-700' :
                                'bg-amber-900/50 text-amber-400 border-amber-700';
+
+            const startDate = req.start_date || req.from_date || req.startDate || '—';
+            const endDate = req.end_date || req.to_date || req.endDate || '—';
 
             tableBody.innerHTML += `
               <tr class="hover:bg-slate-800/50">
-                <td class="p-3 font-medium text-slate-200">${req.start_date || req.from_date} to ${req.end_date || req.to_date}</td>
-                <td class="p-3">${req.days || 1} day(s)</td>
-                <td class="p-3">${req.reason}</td>
+                <td class="p-3 font-medium text-slate-200">${startDate} to ${endDate}</td>
+                <td class="p-3">${daysCount} day(s)</td>
+                <td class="p-3">${req.reason || '—'}</td>
                 <td class="p-3">
                   <span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeColor}">
-                    ${req.status || 'PENDING'}
+                    ${status}
                   </span>
                 </td>
-                <td class="p-3 text-slate-400 italic">${req.feedback || '—'}</td>
+                <td class="p-3 text-slate-400 italic">${req.feedback || req.manager_feedback || '—'}</td>
               </tr>
             `;
           });
         }
 
-        document.getElementById('balanceDays').textContent = `${20 - approvedDays} Days`;
+        document.getElementById('balanceDays').textContent = `${Math.max(0, 20 - approvedDays)} Days`;
         document.getElementById('pendingCount').textContent = pending;
         document.getElementById('approvedCount').textContent = approved;
         document.getElementById('rejectedCount').textContent = rejected;
@@ -369,7 +398,7 @@
       }
     }
 
-    // Submit Leave Request Logic with calculated days and error response parsing
+    // Submit Leave Request
     async function submitLeaveRequest(e) {
       e.preventDefault();
       const startDate = document.getElementById('startDate').value;
@@ -379,13 +408,11 @@
       const uId = currentUser.id || currentUser.user_id || currentUser._id || currentUser.email;
       const empName = currentUser.full_name || currentUser.name || currentUser.username || currentUser.email;
 
-      // Calculate number of days
       let days = 1;
       if (startDate && endDate) {
         const start = new Date(startDate);
         const end = new Date(endDate);
-        const diffTime = Math.abs(end - start);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        const diffDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
         if (!isNaN(diffDays) && diffDays > 0) days = diffDays;
       }
 
@@ -395,6 +422,7 @@
         employee_name: empName,
         user_name: empName,
         name: empName,
+        email: currentUser.email,
         start_date: startDate,
         end_date: endDate,
         from_date: startDate,
@@ -415,18 +443,8 @@
 
         if (!res.ok) {
           let errorMsg = "Failed to submit leave request";
-          if (typeof data.detail === 'string') {
-            errorMsg = data.detail;
-          } else if (Array.isArray(data.detail)) {
-            errorMsg = data.detail.map(item => {
-              const field = item.loc ? item.loc[item.loc.length - 1] : '';
-              return field ? `${field}: ${item.msg}` : (item.msg || JSON.stringify(item));
-            }).join(' | ');
-          } else if (data.detail && typeof data.detail === 'object') {
-            errorMsg = data.detail.message || JSON.stringify(data.detail);
-          } else if (data.message) {
-            errorMsg = data.message;
-          }
+          if (typeof data.detail === 'string') errorMsg = data.detail;
+          else if (Array.isArray(data.detail)) errorMsg = data.detail.map(i => i.msg || JSON.stringify(i)).join(', ');
           throw new Error(errorMsg);
         }
 
@@ -434,47 +452,55 @@
         document.getElementById('startDate').value = '';
         document.getElementById('endDate').value = '';
         document.getElementById('reason').value = '';
-        loadEmployeeData();
+        
+        // Instantly refresh employee dashboard table
+        await loadEmployeeData();
+
       } catch (err) {
         showToast(err.message, false);
       }
     }
 
-    // Manager Dashboard Logic
+    // Load Manager Data
     async function loadManagerData() {
       try {
-        const res = await fetch(`${API_BASE}/leave-requests`);
-        const requests = await res.json().catch(() => []);
+        const requests = await fetchAllLeaveRequests();
         const tableBody = document.getElementById('managerRequestsTable');
         tableBody.innerHTML = '';
 
-        if (!Array.isArray(requests) || requests.length === 0) {
+        if (requests.length === 0) {
           tableBody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No leave requests submitted yet.</td></tr>`;
           return;
         }
 
         requests.forEach(req => {
-          const badgeColor = req.status === 'APPROVED' ? 'bg-emerald-900/50 text-emerald-400 border-emerald-700' :
-                             req.status === 'REJECTED' ? 'bg-rose-900/50 text-rose-400 border-rose-700' :
+          const status = (req.status || 'PENDING').toUpperCase();
+          const badgeColor = status === 'APPROVED' ? 'bg-emerald-900/50 text-emerald-400 border-emerald-700' :
+                             status === 'REJECTED' ? 'bg-rose-900/50 text-rose-400 border-rose-700' :
                              'bg-amber-900/50 text-amber-400 border-amber-700';
 
           const reqId = req.id || req._id;
-          const actionButtons = (req.status === 'PENDING' || !req.status) ? `
+          const empName = req.employee_name || req.user_name || req.name || req.email || req.user_id || 'Employee';
+          const startDate = req.start_date || req.from_date || req.startDate || '—';
+          const endDate = req.end_date || req.to_date || req.endDate || '—';
+          const daysCount = req.days || req.duration || 1;
+
+          const actionButtons = (status === 'PENDING') ? `
             <div class="flex space-x-2">
               <button onclick="updateStatus('${reqId}', 'APPROVED')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded text-xs font-bold transition">Approve</button>
               <button onclick="updateStatus('${reqId}', 'REJECTED')" class="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1 rounded text-xs font-bold transition">Reject</button>
             </div>
-          ` : `<span class="text-xs text-slate-500">Processed</span>`;
+          ` : `<span class="text-xs text-slate-500 font-semibold">Processed</span>`;
 
           tableBody.innerHTML += `
             <tr class="hover:bg-slate-800/50">
-              <td class="p-3 font-semibold text-slate-200">${req.employee_name || req.user_name || req.name || req.user_id}</td>
-              <td class="p-3">${req.start_date || req.from_date} to ${req.end_date || req.to_date}</td>
-              <td class="p-3">${req.days || 1} day(s)</td>
-              <td class="p-3">${req.reason}</td>
+              <td class="p-3 font-semibold text-slate-200">${empName}</td>
+              <td class="p-3">${startDate} to ${endDate}</td>
+              <td class="p-3">${daysCount} day(s)</td>
+              <td class="p-3">${req.reason || '—'}</td>
               <td class="p-3">
                 <span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeColor}">
-                  ${req.status || 'PENDING'}
+                  ${status}
                 </span>
               </td>
               <td class="p-3">${actionButtons}</td>
@@ -486,6 +512,7 @@
       }
     }
 
+    // Manager Action Handler
     async function updateStatus(requestId, status) {
       let feedback = "";
       if (status === 'REJECTED') {
@@ -502,11 +529,9 @@
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          let errorMsg = "Failed to update status";
+          let errorMsg = "Failed to update request status";
           if (typeof data.detail === 'string') errorMsg = data.detail;
-          else if (Array.isArray(data.detail)) {
-            errorMsg = data.detail.map(i => i.msg || JSON.stringify(i)).join(', ');
-          }
+          else if (Array.isArray(data.detail)) errorMsg = data.detail.map(i => i.msg || JSON.stringify(i)).join(', ');
           throw new Error(errorMsg);
         }
 
