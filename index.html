@@ -10,7 +10,7 @@
 <body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
 
   <!-- Custom Toast Notification Banner -->
-  <div id="toast" class="fixed top-5 right-5 z-50 hidden px-5 py-3 rounded-xl shadow-2xl text-white font-medium transition-all transform duration-300">
+  <div id="toast" class="fixed top-5 right-5 z-50 hidden px-5 py-3 rounded-xl shadow-2xl text-white font-medium transition-all transform duration-300 max-w-md">
     <span id="toastMsg"></span>
   </div>
 
@@ -34,8 +34,8 @@
       
       <!-- Role Switcher Tabs -->
       <div class="flex bg-slate-900 p-1 rounded-xl mb-6">
-        <button id="tabEmployee" onclick="switchAuthMode('employee')" class="flex-1 py-2 rounded-lg text-sm font-semibold transition bg-emerald-600 text-white">Employee</button>
-        <button id="tabManager" onclick="switchAuthMode('manager')" class="flex-1 py-2 rounded-lg text-sm font-semibold text-slate-400 hover:text-white transition">Manager</button>
+        <button id="tabEmployee" type="button" onclick="switchAuthMode('employee')" class="flex-1 py-2 rounded-lg text-sm font-semibold transition bg-emerald-600 text-white">Employee</button>
+        <button id="tabManager" type="button" onclick="switchAuthMode('manager')" class="flex-1 py-2 rounded-lg text-sm font-semibold text-slate-400 hover:text-white transition">Manager</button>
       </div>
 
       <!-- Auth Form -->
@@ -62,7 +62,7 @@
 
       <!-- Toggle Registration Button -->
       <div class="text-center mt-6">
-        <button id="toggleRegisterBtn" onclick="toggleRegistration()" class="text-sm text-emerald-400 hover:underline">Don't have an account? Register Now</button>
+        <button id="toggleRegisterBtn" type="button" onclick="toggleRegistration()" class="text-sm text-emerald-400 hover:underline">Don't have an account? Register Now</button>
       </div>
     </div>
 
@@ -173,20 +173,20 @@
     let authRole = 'employee';
     let isRegisterMode = false;
 
-    // Custom Toast Helper
+    // Toast Notification Helper
     function showToast(message, isSuccess = true) {
       const toast = document.getElementById('toast');
       const toastMsg = document.getElementById('toastMsg');
       
       toastMsg.textContent = message;
-      toast.className = `fixed top-5 right-5 z-50 px-5 py-3 rounded-xl shadow-2xl text-white font-medium transition-all transform duration-300 ${
+      toast.className = `fixed top-5 right-5 z-50 px-5 py-3 rounded-xl shadow-2xl text-white font-medium transition-all transform duration-300 max-w-md ${
         isSuccess ? 'bg-emerald-600' : 'bg-rose-600'
       }`;
       
       toast.classList.remove('hidden');
       setTimeout(() => {
         toast.classList.add('hidden');
-      }, 3500);
+      }, 4000);
     }
 
     // Role Switcher
@@ -211,7 +211,10 @@
 
     function toggleRegistration() {
       isRegisterMode = !isRegisterMode;
+      const fullNameInput = document.getElementById('fullName');
       document.getElementById('fullNameGroup').classList.toggle('hidden', !isRegisterMode);
+      fullNameInput.required = isRegisterMode;
+
       document.getElementById('toggleRegisterBtn').textContent = isRegisterMode 
         ? "Already have an account? Sign In" 
         : "Don't have an account? Register Now";
@@ -230,7 +233,7 @@
       }
     }
 
-    // Auth Logic with Robust Error Parsing
+    // Auth Logic with Compatible Payload Aliases & Detailed Error Format
     async function handleAuth(event) {
       event.preventDefault();
       const email = document.getElementById('email').value.trim();
@@ -238,9 +241,23 @@
       const fullName = document.getElementById('fullName').value.trim();
 
       const endpoint = isRegisterMode ? '/register' : '/login';
+
+      // Pass email, username, full_name, and name to support any FastAPI/Pydantic field names
       const payload = isRegisterMode 
-        ? { email, password, full_name: fullName, role: authRole }
-        : { email, password, role: authRole };
+        ? { 
+            email: email, 
+            username: email, 
+            password: password, 
+            full_name: fullName || email, 
+            name: fullName || email, 
+            role: authRole 
+          }
+        : { 
+            email: email, 
+            username: email, 
+            password: password, 
+            role: authRole 
+          };
 
       try {
         const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -256,7 +273,11 @@
           if (typeof data.detail === 'string') {
             errorMsg = data.detail;
           } else if (Array.isArray(data.detail)) {
-            errorMsg = data.detail.map(item => item.msg || item.message || JSON.stringify(item)).join(', ');
+            // Include field name from Pydantic error loc array
+            errorMsg = data.detail.map(item => {
+              const field = item.loc ? item.loc[item.loc.length - 1] : '';
+              return field ? `${field}: ${item.msg}` : (item.msg || JSON.stringify(item));
+            }).join(' | ');
           } else if (data.detail && typeof data.detail === 'object') {
             errorMsg = data.detail.message || JSON.stringify(data.detail);
           } else if (data.message) {
@@ -278,7 +299,7 @@
     function setupDashboard() {
       document.getElementById('authSection').classList.add('hidden');
       document.getElementById('userHeader').classList.remove('hidden');
-      document.getElementById('userInfo').textContent = `${currentUser.full_name || currentUser.email} (${currentUser.role.toUpperCase()})`;
+      document.getElementById('userInfo').textContent = `${currentUser.full_name || currentUser.name || currentUser.email} (${currentUser.role.toUpperCase()})`;
 
       if (currentUser.role === 'manager') {
         document.getElementById('managerDashboard').classList.remove('hidden');
@@ -301,7 +322,8 @@
     // Employee Logic
     async function loadEmployeeData() {
       try {
-        const res = await fetch(`${API_BASE}/leave-requests?user_id=${currentUser.id}`);
+        const userId = currentUser.id || currentUser.user_id || currentUser.email;
+        const res = await fetch(`${API_BASE}/leave-requests?user_id=${userId}`);
         const requests = await res.json();
 
         let pending = 0, approved = 0, rejected = 0, approvedDays = 0;
@@ -354,14 +376,15 @@
       const startDate = document.getElementById('startDate').value;
       const endDate = document.getElementById('endDate').value;
       const reason = document.getElementById('reason').value;
+      const userId = currentUser.id || currentUser.user_id || currentUser.email;
 
       try {
         const res = await fetch(`${API_BASE}/leave-requests`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            user_id: currentUser.id,
-            employee_name: currentUser.full_name || currentUser.email,
+            user_id: userId,
+            employee_name: currentUser.full_name || currentUser.name || currentUser.email,
             start_date: startDate,
             end_date: endDate,
             reason: reason
