@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LveSync Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <span class="text-2xl">🌴</span>
+                <h1 class="text-xl font-bold">LveSync Portal</h1>
+            </div>
+            <div id="userInfo" class="hidden items-center space-x-4">
+                <span id="userBadge" class="bg-indigo-800 text-indigo-100 text-xs px-3 py-1.5 rounded-full font-medium"></span>
+                <button onclick="logout()" class="text-xs bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg transition font-semibold">Sign Out</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-6 py-8">
+
+        <!-- ================= 1. AUTHENTICATION SCREEN ================= -->
+        <div id="screenAuth" class="max-w-md mx-auto mt-8 bg-white p-8 rounded-2xl shadow-md border border-slate-200">
+            <!-- Mode Tabs: Employee vs Manager -->
+            <div class="flex bg-slate-100 p-1 rounded-xl mb-6">
+                <button id="tabEmp" onclick="setRole('employee')" class="w-1/2 py-2 text-sm font-semibold rounded-lg bg-white text-indigo-600 shadow-sm">👤 Employee</button>
+                <button id="tabMgr" onclick="setRole('manager')" class="w-1/2 py-2 text-sm font-semibold rounded-lg text-slate-500 hover:text-slate-800">🛡️ Manager</button>
+            </div>
+
+            <!-- LOGIN FORM -->
+            <form id="loginForm" class="space-y-4">
+                <h2 id="authTitle" class="text-xl font-bold text-slate-900 text-center">Employee Sign In</h2>
+                <div>
+                    <label class="text-xs font-semibold text-slate-600 uppercase">Email Address</label>
+                    <input type="email" id="loginEmail" required placeholder="user@example.com" class="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-slate-600 uppercase">Password</label>
+                    <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition">Sign In</button>
+            </form>
+
+            <!-- REGISTER FORM (Employee Only) -->
+            <form id="registerForm" class="hidden space-y-4">
+                <h2 class="text-xl font-bold text-slate-900 text-center">Create Employee Account</h2>
+                <div>
+                    <label class="text-xs font-semibold text-slate-600 uppercase">Full Name</label>
+                    <input type="text" id="regName" required placeholder="John Doe" class="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-slate-600 uppercase">Email Address</label>
+                    <input type="email" id="regEmail" required placeholder="john@example.com" class="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-slate-600 uppercase">Password</label>
+                    <input type="password" id="regPassword" required placeholder="••••••••" class="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg transition">Register Now</button>
+            </form>
+
+            <div id="toggleAuthWrapper" class="mt-4 text-center">
+                <button onclick="toggleAuthMode()" id="btnToggleAuth" class="text-xs text-indigo-600 hover:underline font-medium">Need an account? Register here</button>
+            </div>
+        </div>
+
+        <!-- ================= 2. EMPLOYEE DASHBOARD ================= -->
+        <div id="screenEmployee" class="hidden space-y-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Apply Form -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h2 class="text-lg font-bold text-slate-900 mb-1">Request Time Off</h2>
+                    <p class="text-xs text-slate-500 mb-4">Submit dates for manager review.</p>
+                    <form id="applyLeaveForm" class="space-y-4">
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 uppercase">Start Date</label>
+                            <input type="date" id="startDate" required class="w-full mt-1 px-3 py-2 border rounded-lg outline-none text-sm">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 uppercase">End Date</label>
+                            <input type="date" id="endDate" required class="w-full mt-1 px-3 py-2 border rounded-lg outline-none text-sm">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-slate-600 uppercase">Reason</label>
+                            <input type="text" id="leaveReason" placeholder="Vacation, Personal..." required class="w-full mt-1 px-3 py-2 border rounded-lg outline-none text-sm">
+                        </div>
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg transition">Submit Request</button>
+                    </form>
+                </div>
+
+                <!-- History Table & Balance Display -->
+                <div class="md:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-bold text-slate-900">My Leave Applications (Day 1 to Present)</h2>
+                        <span id="empBalanceBadge" class="bg-indigo-100 text-indigo-800 font-bold px-3 py-1 rounded-lg text-xs"></span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600">
+                            <thead class="bg-slate-50 text-xs text-slate-700 uppercase">
+                                <tr>
+                                    <th class="p-3">Req ID</th>
+                                    <th class="p-3">Dates</th>
+                                    <th class="p-3">Reason</th>
+                                    <th class="p-3">Status</th>
+                                    <th class="p-3">Notes / Feedback</th>
+                                </tr>
+                            </thead>
+                            <tbody id="empLeaveHistory" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= 3. MANAGER DASHBOARD ================= -->
+        <div id="screenManager" class="hidden space-y-8">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900">Manager Central Approval Dashboard</h2>
+                        <p class="text-xs text-slate-500">Review all company leave applications.</p>
+                    </div>
+                    <button onclick="loadManagerLeaves()" class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg">🔄 Refresh</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-600">
+                        <thead class="bg-slate-50 text-xs text-slate-700 uppercase">
+                            <tr>
+                                <th class="p-3">Req ID</th>
+                                <th class="p-3">Employee</th>
+                                <th class="p-3">Dates</th>
+                                <th class="p-3">Reason</th>
+                                <th class="p-3">Status</th>
+                                <th class="p-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mgrLeaveTable" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000";
+        let currentRole = "employee";
+        let isRegistering = false;
+        let currentUser = null;
+
+        function setRole(role) {
+            currentRole = role;
+            document.getElementById("tabEmp").className = role === 'employee' ? "w-1/2 py-2 text-sm font-semibold rounded-lg bg-white text-indigo-600 shadow-sm" : "w-1/2 py-2 text-sm font-semibold rounded-lg text-slate-500";
+            document.getElementById("tabMgr").className = role === 'manager' ? "w-1/2 py-2 text-sm font-semibold rounded-lg bg-white text-indigo-600 shadow-sm" : "w-1/2 py-2 text-sm font-semibold rounded-lg text-slate-500";
+            
+            document.getElementById("authTitle").innerText = role === 'employee' ? "Employee Sign In" : "Manager Sign In";
+            if (role === 'manager') {
+                isRegistering = false;
+                document.getElementById("loginForm").classList.remove("hidden");
+                document.getElementById("registerForm").classList.add("hidden");
+                document.getElementById("toggleAuthWrapper").classList.add("hidden");
+            } else {
+                document.getElementById("toggleAuthWrapper").classList.remove("hidden");
+            }
+        }
+
+        function toggleAuthMode() {
+            isRegistering = !isRegistering;
+            if(isRegistering) {
+                document.getElementById("loginForm").classList.add("hidden");
+                document.getElementById("registerForm").classList.remove("hidden");
+                document.getElementById("btnToggleAuth").innerText = "Already have an account? Sign In";
+            } else {
+                document.getElementById("registerForm").classList.add("hidden");
+                document.getElementById("loginForm").classList.remove("hidden");
+                document.getElementById("btnToggleAuth").innerText = "Need an account? Register here";
+            }
+        }
+
+        document.getElementById("loginForm").onsubmit = async (e) => {
+            e.preventDefault();
+            const res = await fetch(`${API_BASE}/login`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email: document.getElementById("loginEmail").value,
+                    password: document.getElementById("loginPassword").value,
+                    role: currentRole
+                })
+            });
+
+            if (!res.ok) {
+                alert("Invalid Credentials or Role!");
+                return;
+            }
+
+            const data = await res.json();
+            currentUser = data.user;
+            setupPortal();
+        };
+
+        document.getElementById("registerForm").onsubmit = async (e) => {
+            e.preventDefault();
+            const res = await fetch(`${API_BASE}/register`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: document.getElementById("regName").value,
+                    email: document.getElementById("regEmail").value,
+                    password: document.getElementById("regPassword").value
+                })
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                alert(err.detail);
+                return;
+            }
+
+            const data = await res.json();
+            currentUser = data.user;
+            alert("Registration successful! Logging you in...");
+            setupPortal();
+        };
+
+        function setupPortal() {
+            document.getElementById("screenAuth").classList.add("hidden");
+            document.getElementById("userInfo").classList.remove("hidden");
+            document.getElementById("userBadge").innerText = `${currentUser.name} (${currentUser.role.toUpperCase()})`;
+
+            if (currentUser.role === 'employee') {
+                document.getElementById("screenEmployee").classList.remove("hidden");
+                loadEmployeeLeaves();
+            } else {
+                document.getElementById("screenManager").classList.remove("hidden");
+                loadManagerLeaves();
+            }
+        }
+
+        async function loadEmployeeLeaves() {
+            const res = await fetch(`${API_BASE}/leave-requests/employee/${currentUser.id}`);
+            const data = await res.json();
+            document.getElementById("empBalanceBadge").innerText = `Available Balance: ${data.leave_balance} Days`;
+            
+            const tbody = document.getElementById("empLeaveHistory");
+            tbody.innerHTML = data.leave_requests.map(r => `
+                <tr>
+                    <td class="p-3 font-bold">#${r.id}</td>
+                    <td class="p-3 text-xs font-mono">${r.start_date} → ${r.end_date}</td>
+                    <td class="p-3">${r.reason}</td>
+                    <td class="p-3">
+                        <span class="px-2 py-1 rounded text-xs font-semibold ${
+                            r.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                            r.status === 'Rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+                        }">${r.status}</span>
+                    </td>
+                    <td class="p-3 text-xs text-slate-500">${r.rejection_reason ?? '-'}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function loadManagerLeaves() {
+            const res = await fetch(`${API_BASE}/leave-requests/manager`);
+            const data = await res.json();
+            const tbody = document.getElementById("mgrLeaveTable");
+            tbody.innerHTML = data.leave_requests.map(r => `
+                <tr>
+                    <td class="p-3 font-bold">#${r.id}</td>
+                    <td class="p-3 font-medium">${r.employees ? r.employees.name : 'Emp #' + r.employee_id} <span class="text-xs text-slate-400 block">${r.employees ? r.employees.email : ''}</span></td>
+                    <td class="p-3 text-xs font-mono">${r.start_date} → ${r.end_date}</td>
+                    <td class="p-3">${r.reason}</td>
+                    <td class="p-3">
+                        <span class="px-2 py-1 rounded text-xs font-semibold ${
+                            r.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                            r.status === 'Rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+                        }">${r.status}</span>
+                    </td>
+                    <td class="p-3">
+                        ${r.status.toLowerCase() === 'pending' ? `
+                            <div class="flex space-x-2">
+                                <button onclick="handleApprove(${r.id})" class="bg-emerald-600 text-white px-2 py-1 rounded text-xs font-medium hover:bg-emerald-700">Approve</button>
+                                <button onclick="handleReject(${r.id})" class="bg-rose-600 text-white px-2 py-1 rounded text-xs font-medium hover:bg-rose-700">Reject</button>
+                            </div>
+                        ` : '<span class="text-slate-400 text-xs">Reviewed</span>'}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById("applyLeaveForm").onsubmit = async (e) => {
+            e.preventDefault();
+            await fetch(`${API_BASE}/leave-requests/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    employee_id: currentUser.id,
+                    start_date: document.getElementById("startDate").value,
+                    end_date: document.getElementById("endDate").value,
+                    reason: document.getElementById("leaveReason").value
+                })
+            });
+            alert("Leave application submitted!");
+            e.target.reset();
+            loadEmployeeLeaves();
+        };
+
+        async function handleApprove(reqId) {
+            const res = await fetch(`${API_BASE}/leave-requests/${reqId}/status`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "Approved" })
+            });
+            if(!res.ok) {
+                const err = await res.json();
+                alert(err.detail);
+            } else {
+                alert(`Leave #${reqId} Approved!`);
+            }
+            loadManagerLeaves();
+        }
+
+        async function handleReject(reqId) {
+            const reason = prompt("Enter Rejection Reason for employee transparency:");
+            if (reason === null) return; // User cancelled prompt
+
+            await fetch(`${API_BASE}/leave-requests/${reqId}/status`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                    status: "Rejected",
+                    rejection_reason: reason 
+                })
+            });
+            alert(`Leave #${reqId} Rejected.`);
+            loadManagerLeaves();
+        }
+
+        function logout() {
+            window.location.reload();
+        }
+    </script>
+</body>
+</html>
