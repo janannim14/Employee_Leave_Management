@@ -173,7 +173,7 @@
     let authRole = 'employee';
     let isRegisterMode = false;
 
-    // Toast Notification Helper
+    // Toast Helper
     function showToast(message, isSuccess = true) {
       const toast = document.getElementById('toast');
       const toastMsg = document.getElementById('toastMsg');
@@ -233,7 +233,7 @@
       }
     }
 
-    // Auth Logic with Compatible Payload Aliases & Detailed Error Format
+    // Authentication Logic
     async function handleAuth(event) {
       event.preventDefault();
       const email = document.getElementById('email').value.trim();
@@ -242,7 +242,6 @@
 
       const endpoint = isRegisterMode ? '/register' : '/login';
 
-      // Pass email, username, full_name, and name to support any FastAPI/Pydantic field names
       const payload = isRegisterMode 
         ? { 
             email: email, 
@@ -266,14 +265,13 @@
           body: JSON.stringify(payload)
         });
 
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
           let errorMsg = "Authentication failed";
           if (typeof data.detail === 'string') {
             errorMsg = data.detail;
           } else if (Array.isArray(data.detail)) {
-            // Include field name from Pydantic error loc array
             errorMsg = data.detail.map(item => {
               const field = item.loc ? item.loc[item.loc.length - 1] : '';
               return field ? `${field}: ${item.msg}` : (item.msg || JSON.stringify(item));
@@ -319,12 +317,12 @@
       showToast("Signed out successfully", true);
     }
 
-    // Employee Logic
+    // Employee Dashboard Logic
     async function loadEmployeeData() {
       try {
-        const userId = currentUser.id || currentUser.user_id || currentUser.email;
-        const res = await fetch(`${API_BASE}/leave-requests?user_id=${userId}`);
-        const requests = await res.json();
+        const uId = currentUser.id || currentUser.user_id || currentUser._id || currentUser.email;
+        const res = await fetch(`${API_BASE}/leave-requests?user_id=${uId}`);
+        const requests = await res.json().catch(() => []);
 
         let pending = 0, approved = 0, rejected = 0, approvedDays = 0;
         const tableBody = document.getElementById('employeeHistoryTable');
@@ -347,12 +345,12 @@
 
             tableBody.innerHTML += `
               <tr class="hover:bg-slate-800/50">
-                <td class="p-3 font-medium text-slate-200">${req.start_date} to ${req.end_date}</td>
+                <td class="p-3 font-medium text-slate-200">${req.start_date || req.from_date} to ${req.end_date || req.to_date}</td>
                 <td class="p-3">${req.days || 1} day(s)</td>
                 <td class="p-3">${req.reason}</td>
                 <td class="p-3">
                   <span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeColor}">
-                    ${req.status}
+                    ${req.status || 'PENDING'}
                   </span>
                 </td>
                 <td class="p-3 text-slate-400 italic">${req.feedback || '—'}</td>
@@ -371,27 +369,66 @@
       }
     }
 
+    // Submit Leave Request Logic with calculated days and error response parsing
     async function submitLeaveRequest(e) {
       e.preventDefault();
       const startDate = document.getElementById('startDate').value;
       const endDate = document.getElementById('endDate').value;
       const reason = document.getElementById('reason').value;
-      const userId = currentUser.id || currentUser.user_id || currentUser.email;
+
+      const uId = currentUser.id || currentUser.user_id || currentUser._id || currentUser.email;
+      const empName = currentUser.full_name || currentUser.name || currentUser.username || currentUser.email;
+
+      // Calculate number of days
+      let days = 1;
+      if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const diffTime = Math.abs(end - start);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        if (!isNaN(diffDays) && diffDays > 0) days = diffDays;
+      }
+
+      const payload = {
+        user_id: uId,
+        employee_id: uId,
+        employee_name: empName,
+        user_name: empName,
+        name: empName,
+        start_date: startDate,
+        end_date: endDate,
+        from_date: startDate,
+        to_date: endDate,
+        reason: reason,
+        days: days,
+        status: "PENDING"
+      };
 
       try {
         const res = await fetch(`${API_BASE}/leave-requests`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_id: userId,
-            employee_name: currentUser.full_name || currentUser.name || currentUser.email,
-            start_date: startDate,
-            end_date: endDate,
-            reason: reason
-          })
+          body: JSON.stringify(payload)
         });
 
-        if (!res.ok) throw new Error("Failed to submit leave request");
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          let errorMsg = "Failed to submit leave request";
+          if (typeof data.detail === 'string') {
+            errorMsg = data.detail;
+          } else if (Array.isArray(data.detail)) {
+            errorMsg = data.detail.map(item => {
+              const field = item.loc ? item.loc[item.loc.length - 1] : '';
+              return field ? `${field}: ${item.msg}` : (item.msg || JSON.stringify(item));
+            }).join(' | ');
+          } else if (data.detail && typeof data.detail === 'object') {
+            errorMsg = data.detail.message || JSON.stringify(data.detail);
+          } else if (data.message) {
+            errorMsg = data.message;
+          }
+          throw new Error(errorMsg);
+        }
 
         showToast("Leave request submitted successfully!", true);
         document.getElementById('startDate').value = '';
@@ -403,11 +440,11 @@
       }
     }
 
-    // Manager Logic
+    // Manager Dashboard Logic
     async function loadManagerData() {
       try {
         const res = await fetch(`${API_BASE}/leave-requests`);
-        const requests = await res.json();
+        const requests = await res.json().catch(() => []);
         const tableBody = document.getElementById('managerRequestsTable');
         tableBody.innerHTML = '';
 
@@ -421,22 +458,23 @@
                              req.status === 'REJECTED' ? 'bg-rose-900/50 text-rose-400 border-rose-700' :
                              'bg-amber-900/50 text-amber-400 border-amber-700';
 
-          const actionButtons = req.status === 'PENDING' ? `
+          const reqId = req.id || req._id;
+          const actionButtons = (req.status === 'PENDING' || !req.status) ? `
             <div class="flex space-x-2">
-              <button onclick="updateStatus('${req.id}', 'APPROVED')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded text-xs font-bold transition">Approve</button>
-              <button onclick="updateStatus('${req.id}', 'REJECTED')" class="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1 rounded text-xs font-bold transition">Reject</button>
+              <button onclick="updateStatus('${reqId}', 'APPROVED')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded text-xs font-bold transition">Approve</button>
+              <button onclick="updateStatus('${reqId}', 'REJECTED')" class="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1 rounded text-xs font-bold transition">Reject</button>
             </div>
           ` : `<span class="text-xs text-slate-500">Processed</span>`;
 
           tableBody.innerHTML += `
             <tr class="hover:bg-slate-800/50">
-              <td class="p-3 font-semibold text-slate-200">${req.employee_name || req.user_id}</td>
-              <td class="p-3">${req.start_date} to ${req.end_date}</td>
+              <td class="p-3 font-semibold text-slate-200">${req.employee_name || req.user_name || req.name || req.user_id}</td>
+              <td class="p-3">${req.start_date || req.from_date} to ${req.end_date || req.to_date}</td>
               <td class="p-3">${req.days || 1} day(s)</td>
               <td class="p-3">${req.reason}</td>
               <td class="p-3">
                 <span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeColor}">
-                  ${req.status}
+                  ${req.status || 'PENDING'}
                 </span>
               </td>
               <td class="p-3">${actionButtons}</td>
@@ -461,7 +499,16 @@
           body: JSON.stringify({ status, feedback })
         });
 
-        if (!res.ok) throw new Error("Failed to update status");
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          let errorMsg = "Failed to update status";
+          if (typeof data.detail === 'string') errorMsg = data.detail;
+          else if (Array.isArray(data.detail)) {
+            errorMsg = data.detail.map(i => i.msg || JSON.stringify(i)).join(', ');
+          }
+          throw new Error(errorMsg);
+        }
 
         showToast(`Request ${status.toLowerCase()} successfully!`, true);
         loadManagerData();
