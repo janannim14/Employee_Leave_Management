@@ -239,7 +239,7 @@
     // Role Switching
     function switchAuthMode(role) {
       authRole = role;
-      clearAuthInputs(); // Clear credentials when switching roles
+      clearAuthInputs();
       
       const tabEmp = document.getElementById('tabEmployee');
       const tabMgr = document.getElementById('tabManager');
@@ -315,7 +315,7 @@
 
         localStorage.setItem('lvesync_user', JSON.stringify(currentUser));
         
-        clearAuthInputs(); // Clear form values upon login
+        clearAuthInputs();
         showToast(isRegisterMode ? "Registration successful!" : "Login successful!", true);
         setupDashboard();
       } catch (err) {
@@ -345,7 +345,7 @@
       currentUser = null;
       localStorage.removeItem('lvesync_user');
       
-      clearAuthInputs(); // Wipe out email and password fields on sign out
+      clearAuthInputs();
 
       document.getElementById('userHeader').classList.add('hidden');
       document.getElementById('employeeDashboard').classList.add('hidden');
@@ -383,21 +383,24 @@
       return Array.from(map.values());
     }
 
-    // Employee Dashboard Loader
+    // Employee Dashboard Loader (Strict per-employee filtering)
     async function loadEmployeeData() {
       const allReqs = await getAllRequests();
       const myEmail = (currentUser?.email || '').toLowerCase();
+      const myName = (currentUser?.full_name || currentUser?.name || '').toLowerCase();
       const myId = String(currentUser?.id || currentUser?.user_id || '').toLowerCase();
 
       let myReqs = allReqs.filter(r => {
         const rEmail = String(r.email || r.user_email || r.employee_email || '').toLowerCase();
+        const rName = String(r.employee_name || r.user_name || r.name || '').toLowerCase();
         const rId = String(r.user_id || r.employee_id || '').toLowerCase();
-        return (myEmail && rEmail === myEmail) || (myId && rId === myId) || rEmail.includes(myEmail);
-      });
 
-      if (myReqs.length === 0 && allReqs.length > 0) {
-        myReqs = allReqs;
-      }
+        const matchEmail = myEmail && rEmail && (rEmail === myEmail || rEmail.includes(myEmail));
+        const matchName = myName && rName && (rName === myName || rName.includes(myName));
+        const matchId = myId && rId && rId === myId;
+
+        return matchEmail || matchName || matchId;
+      });
 
       let pending = 0, approved = 0, rejected = 0, approvedDays = 0;
       const tbody = document.getElementById('employeeHistoryTable');
