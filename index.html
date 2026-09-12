@@ -136,12 +136,28 @@
     <!-- Manager Dashboard -->
     <div id="managerDashboard" class="hidden space-y-8">
       <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
-        <div class="flex justify-between items-center mb-6">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
             <h3 class="text-xl font-bold text-slate-100">Manager Central Approval Dashboard</h3>
-            <p class="text-slate-400 text-sm">Review all company leave applications.</p>
+            <p class="text-slate-400 text-sm">Review and search all company leave applications.</p>
           </div>
-          <button onclick="loadManagerData()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-lg text-sm font-semibold transition">🔄 Refresh</button>
+          
+          <!-- Search & Filter Bar -->
+          <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <div class="relative flex-1 md:w-64">
+              <input type="text" id="managerSearch" oninput="loadManagerData()" placeholder="Search employee or reason..." class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-500 text-xs"></i>
+            </div>
+            
+            <select id="managerStatusFilter" onchange="loadManagerData()" class="bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500">
+              <option value="ALL">All Statuses</option>
+              <option value="PENDING">Pending</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+
+            <button onclick="loadManagerData()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-lg text-sm font-semibold transition">🔄 Refresh</button>
+          </div>
         </div>
 
         <div class="overflow-x-auto">
@@ -221,8 +237,30 @@
       document.getElementById('fullName').value = '';
     }
 
-    // Auto Login Session Restore
+    // Date Restriction Setup (Prevent Past Dates)
+    function setupDateRestrictions() {
+      const today = new Date().toISOString().split('T')[0];
+      const startDateInput = document.getElementById('startDate');
+      const endDateInput = document.getElementById('endDate');
+
+      if (startDateInput && endDateInput) {
+        startDateInput.min = today;
+        endDateInput.min = today;
+
+        startDateInput.addEventListener('change', () => {
+          if (startDateInput.value) {
+            endDateInput.min = startDateInput.value;
+            if (endDateInput.value && endDateInput.value < startDateInput.value) {
+              endDateInput.value = startDateInput.value;
+            }
+          }
+        });
+      }
+    }
+
+    // Auto Login Session Restore & Init
     window.addEventListener('DOMContentLoaded', () => {
+      setupDateRestrictions();
       const savedUser = localStorage.getItem('lvesync_user');
       if (savedUser) {
         try {
@@ -383,7 +421,7 @@
       return Array.from(map.values());
     }
 
-    // Employee Dashboard Loader (Strict per-employee filtering)
+    // Employee Dashboard Loader
     async function loadEmployeeData() {
       const allReqs = await getAllRequests();
       const myEmail = (currentUser?.email || '').toLowerCase();
@@ -446,12 +484,24 @@
       document.getElementById('rejectedCount').textContent = rejected;
     }
 
-    // Submit Request Action
+    // Submit Request Action with Date Validation
     async function submitLeaveRequest(e) {
       e.preventDefault();
       const startDate = document.getElementById('startDate').value;
       const endDate = document.getElementById('endDate').value;
-      const reason = document.getElementById('reason').value;
+      const reason = document.getElementById('reason').value.trim();
+
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      // Strict Date Validations
+      if (startDate < todayStr) {
+        showToast("Start date cannot be in the past!", false);
+        return;
+      }
+      if (endDate < startDate) {
+        showToast("End date cannot be earlier than start date!", false);
+        return;
+      }
 
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -503,14 +553,29 @@
       }
     }
 
-    // Manager Dashboard Loader
+    // Manager Dashboard Loader with Search and Filter
     async function loadManagerData() {
-      const allReqs = await getAllRequests();
+      let allReqs = await getAllRequests();
       const tbody = document.getElementById('managerRequestsTable');
       tbody.innerHTML = '';
 
+      const searchVal = (document.getElementById('managerSearch')?.value || '').toLowerCase().trim();
+      const filterVal = document.getElementById('managerStatusFilter')?.value || 'ALL';
+
+      // Apply Search & Status Filters
+      allReqs = allReqs.filter(req => {
+        const status = (req.status || 'PENDING').toUpperCase();
+        const empName = (req.employee_name || req.user_name || req.name || req.email || '').toLowerCase();
+        const reason = (req.reason || '').toLowerCase();
+
+        const matchesStatus = (filterVal === 'ALL') || (status === filterVal);
+        const matchesSearch = !searchVal || empName.includes(searchVal) || reason.includes(searchVal);
+
+        return matchesStatus && matchesSearch;
+      });
+
       if (allReqs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500 font-medium">No leave requests submitted yet.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500 font-medium">No leave requests found matching your search criteria.</td></tr>`;
         return;
       }
 
