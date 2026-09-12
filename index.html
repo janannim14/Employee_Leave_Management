@@ -326,13 +326,15 @@
     function setupDashboard() {
       document.getElementById('authSection').classList.add('hidden');
       document.getElementById('userHeader').classList.remove('hidden');
-      document.getElementById('userInfo').textContent = `${currentUser.full_name || currentUser.name || currentUser.email} (${currentUser.role.toUpperCase()})`;
 
       if (currentUser.role === 'manager') {
+        document.getElementById('userInfo').textContent = 'Manager';
         document.getElementById('managerDashboard').classList.remove('hidden');
         document.getElementById('employeeDashboard').classList.add('hidden');
         loadManagerData();
       } else {
+        const displayName = currentUser.full_name || currentUser.name || currentUser.email;
+        document.getElementById('userInfo').textContent = displayName;
         document.getElementById('employeeDashboard').classList.remove('hidden');
         document.getElementById('managerDashboard').classList.add('hidden');
         loadEmployeeData();
