@@ -1,4 +1,4 @@
-﻿# 🌴 LveSync Portal — Leave Management System
+﻿# 🌴 LveSync Portal — Employee Leave Management System
 
 A web-based Leave Management System that allows employees to submit time-off requests and managers to review, filter, approve, or reject applications in real time.
 
