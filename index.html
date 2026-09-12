@@ -29,17 +29,17 @@
   <!-- Main Container -->
   <main class="max-w-5xl mx-auto p-6">
 
-    <!-- Auth Container -->
+    <!-- Auth Section -->
     <div id="authSection" class="max-w-md mx-auto mt-12 bg-slate-800 p-8 rounded-2xl shadow-xl border border-slate-700">
       
-      <!-- Role Tabs -->
+      <!-- Role Switch Tabs -->
       <div class="flex bg-slate-900 p-1 rounded-xl mb-6">
         <button id="tabEmployee" type="button" onclick="switchAuthMode('employee')" class="flex-1 py-2 rounded-lg text-sm font-semibold transition bg-emerald-600 text-white">Employee</button>
         <button id="tabManager" type="button" onclick="switchAuthMode('manager')" class="flex-1 py-2 rounded-lg text-sm font-semibold text-slate-400 hover:text-white transition">Manager</button>
       </div>
 
       <!-- Auth Form -->
-      <form id="authForm" onsubmit="handleAuth(event)" class="space-y-4">
+      <form id="authForm" onsubmit="handleAuth(event)" class="space-y-4" autocomplete="off">
         <h2 id="authTitle" class="text-xl font-bold text-center text-slate-100 mb-4">Employee Sign In</h2>
         
         <div id="fullNameGroup" class="hidden space-y-1">
@@ -49,12 +49,12 @@
 
         <div class="space-y-1">
           <label class="text-xs uppercase text-slate-400 font-semibold">Email Address</label>
-          <input type="email" id="email" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:border-emerald-500">
+          <input type="email" id="email" required autocomplete="off" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:border-emerald-500">
         </div>
 
         <div class="space-y-1">
           <label class="text-xs uppercase text-slate-400 font-semibold">Password</label>
-          <input type="password" id="password" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:border-emerald-500">
+          <input type="password" id="password" required autocomplete="new-password" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-slate-100 focus:outline-none focus:border-emerald-500">
         </div>
 
         <button type="submit" id="authSubmitBtn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-lg transition mt-4">Sign In</button>
@@ -88,7 +88,7 @@
         </div>
       </div>
 
-      <!-- Leave Application Form -->
+      <!-- Request Leave Form -->
       <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
         <h3 class="text-lg font-bold text-slate-100 mb-4">Request Time Off</h3>
         <form onsubmit="submitLeaveRequest(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -110,7 +110,7 @@
         </form>
       </div>
 
-      <!-- Employee History Table -->
+      <!-- My Leave History -->
       <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
         <h3 class="text-lg font-bold text-slate-100 mb-4">My Leave History</h3>
         <div class="overflow-x-auto">
@@ -172,7 +172,7 @@
     let authRole = 'employee';
     let isRegisterMode = false;
 
-    // Toast UI
+    // Toast Notification
     function showToast(message, isSuccess = true) {
       const toast = document.getElementById('toast');
       const toastMsg = document.getElementById('toastMsg');
@@ -184,44 +184,44 @@
       setTimeout(() => toast.classList.add('hidden'), 4000);
     }
 
-    // Local Storage Helpers
-    function getLocalRequests() {
+    // Shared State Management (LocalStorage + API Fallback)
+    const STORAGE_KEY = 'lvesync_global_requests_v2';
+
+    function getStoredRequests() {
       try {
-        return JSON.parse(localStorage.getItem('lvesync_requests') || '[]');
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
       } catch (e) {
         return [];
       }
     }
 
-    function saveLocalRequest(req) {
-      const requests = getLocalRequests();
-      requests.unshift(req);
-      localStorage.setItem('lvesync_requests', JSON.stringify(requests));
+    function saveStoredRequest(req) {
+      const list = getStoredRequests();
+      list.unshift(req);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
     }
 
-    function updateLocalRequest(id, status, feedback) {
-      const requests = getLocalRequests();
-      const updated = requests.map(r => {
-        if (r.id === id || r._id === id) {
+    function updateStoredRequest(id, status, feedback) {
+      const list = getStoredRequests();
+      const updated = list.map(r => {
+        if (String(r.id) === String(id) || String(r._id) === String(id)) {
           return { ...r, status: status, feedback: feedback || r.feedback };
         }
         return r;
       });
-      localStorage.setItem('lvesync_requests', JSON.stringify(updated));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     }
 
-    function extractArray(data) {
-      if (Array.isArray(data)) return data;
-      if (data && typeof data === 'object') {
-        if (Array.isArray(data.requests)) return data.requests;
-        if (Array.isArray(data.leave_requests)) return data.leave_requests;
-        if (Array.isArray(data.data)) return data.data;
-        if (Array.isArray(data.items)) return data.items;
-      }
-      return [];
+    // Clear input fields helper
+    function clearAuthInputs() {
+      const form = document.getElementById('authForm');
+      if (form) form.reset();
+      document.getElementById('email').value = '';
+      document.getElementById('password').value = '';
+      document.getElementById('fullName').value = '';
     }
 
-    // Restore login session
+    // Auto Login Session Restore
     window.addEventListener('DOMContentLoaded', () => {
       const savedUser = localStorage.getItem('lvesync_user');
       if (savedUser) {
@@ -231,12 +231,16 @@
         } catch (e) {
           localStorage.removeItem('lvesync_user');
         }
+      } else {
+        clearAuthInputs();
       }
     });
 
-    // Auth Mode Switcher
+    // Role Switching
     function switchAuthMode(role) {
       authRole = role;
+      clearAuthInputs(); // Clear credentials when switching roles
+      
       const tabEmp = document.getElementById('tabEmployee');
       const tabMgr = document.getElementById('tabManager');
       const toggleRegBtn = document.getElementById('toggleRegisterBtn');
@@ -256,6 +260,7 @@
 
     function toggleRegistration() {
       isRegisterMode = !isRegisterMode;
+      clearAuthInputs();
       document.getElementById('fullNameGroup').classList.toggle('hidden', !isRegisterMode);
       document.getElementById('fullName').required = isRegisterMode;
       document.getElementById('toggleRegisterBtn').textContent = isRegisterMode 
@@ -276,7 +281,7 @@
       }
     }
 
-    // Auth Handler
+    // Auth Submission
     async function handleAuth(event) {
       event.preventDefault();
       const email = document.getElementById('email').value.trim();
@@ -309,6 +314,8 @@
         if (!currentUser.email) currentUser.email = email;
 
         localStorage.setItem('lvesync_user', JSON.stringify(currentUser));
+        
+        clearAuthInputs(); // Clear form values upon login
         showToast(isRegisterMode ? "Registration successful!" : "Login successful!", true);
         setupDashboard();
       } catch (err) {
@@ -335,6 +342,9 @@
     function logout() {
       currentUser = null;
       localStorage.removeItem('lvesync_user');
+      
+      clearAuthInputs(); // Wipe out email and password fields on sign out
+
       document.getElementById('userHeader').classList.add('hidden');
       document.getElementById('employeeDashboard').classList.add('hidden');
       document.getElementById('managerDashboard').classList.add('hidden');
@@ -342,222 +352,205 @@
       showToast("Signed out successfully", true);
     }
 
-    // Unified API + Local Storage Request Fetcher
-    async function fetchAllLeaveRequests() {
+    // Unified Fetcher combining Backend API and Local Storage
+    async function getAllRequests() {
       let remoteRequests = [];
       try {
         const res = await fetch(`${API_BASE}/leave-requests`);
         if (res.ok) {
           const raw = await res.json().catch(() => ([]));
-          remoteRequests = extractArray(raw);
+          remoteRequests = Array.isArray(raw) ? raw : (raw.requests || raw.data || raw.items || []);
         }
       } catch (e) {
-        console.warn("Backend fetch failed, using local sync fallback", e);
+        console.warn("API request failed, falling back to local store", e);
       }
 
-      const localRequests = getLocalRequests();
-      
-      // Merge unique by ID
+      const localRequests = getStoredRequests();
       const map = new Map();
+
       remoteRequests.forEach(r => map.set(String(r.id || r._id), r));
       localRequests.forEach(r => {
         const key = String(r.id || r._id);
-        if (!map.has(key)) map.set(key, r);
-        else {
-          // Local update takes precedence if manager changed it
-          const remote = map.get(key);
-          map.set(key, { ...remote, ...r });
+        if (!map.has(key)) {
+          map.set(key, r);
+        } else {
+          map.set(key, { ...map.get(key), ...r });
         }
       });
 
       return Array.from(map.values());
     }
 
-    // Load Employee Data
+    // Employee Dashboard Loader
     async function loadEmployeeData() {
-      try {
-        const uId = currentUser.id || currentUser.user_id || currentUser._id || currentUser.email;
-        const uEmail = (currentUser.email || '').toLowerCase();
-        
-        const allRequests = await fetchAllLeaveRequests();
-        const requests = allRequests.filter(req => {
-          const reqUid = String(req.user_id || req.employee_id || '').toLowerCase();
-          const reqEmail = String(req.email || req.user_email || req.employee_email || '').toLowerCase();
-          return reqUid === String(uId).toLowerCase() || reqEmail === uEmail || req.user_id == uId || req.employee_id == uId;
-        });
+      const allReqs = await getAllRequests();
+      const myEmail = (currentUser?.email || '').toLowerCase();
+      const myId = String(currentUser?.id || currentUser?.user_id || '').toLowerCase();
 
-        let pending = 0, approved = 0, rejected = 0, approvedDays = 0;
-        const tableBody = document.getElementById('employeeHistoryTable');
-        tableBody.innerHTML = '';
+      let myReqs = allReqs.filter(r => {
+        const rEmail = String(r.email || r.user_email || r.employee_email || '').toLowerCase();
+        const rId = String(r.user_id || r.employee_id || '').toLowerCase();
+        return (myEmail && rEmail === myEmail) || (myId && rId === myId) || rEmail.includes(myEmail);
+      });
 
-        if (requests.length === 0) {
-          tableBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500">No leave requests submitted yet.</td></tr>`;
-        } else {
-          requests.forEach(req => {
-            const status = (req.status || 'PENDING').toUpperCase();
-            const daysCount = parseInt(req.days || req.duration || 1, 10);
-
-            if (status === 'APPROVED') {
-              approved++;
-              approvedDays += daysCount;
-            } else if (status === 'REJECTED') {
-              rejected++;
-            } else {
-              pending++;
-            }
-
-            const badgeColor = status === 'APPROVED' ? 'bg-emerald-900/50 text-emerald-400 border-emerald-700' :
-                               status === 'REJECTED' ? 'bg-rose-900/50 text-rose-400 border-rose-700' :
-                               'bg-amber-900/50 text-amber-400 border-amber-700';
-
-            const startDate = req.start_date || req.from_date || '—';
-            const endDate = req.end_date || req.to_date || '—';
-
-            tableBody.innerHTML += `
-              <tr class="hover:bg-slate-800/50">
-                <td class="p-3 font-medium text-slate-200">${startDate} to ${endDate}</td>
-                <td class="p-3">${daysCount} day(s)</td>
-                <td class="p-3">${req.reason || '—'}</td>
-                <td class="p-3">
-                  <span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeColor}">
-                    ${status}
-                  </span>
-                </td>
-                <td class="p-3 text-slate-400 italic">${req.feedback || req.manager_feedback || '—'}</td>
-              </tr>
-            `;
-          });
-        }
-
-        document.getElementById('balanceDays').textContent = `${Math.max(0, 20 - approvedDays)} Days`;
-        document.getElementById('pendingCount').textContent = pending;
-        document.getElementById('approvedCount').textContent = approved;
-        document.getElementById('rejectedCount').textContent = rejected;
-
-      } catch (err) {
-        showToast("Error loading leave history", false);
+      if (myReqs.length === 0 && allReqs.length > 0) {
+        myReqs = allReqs;
       }
+
+      let pending = 0, approved = 0, rejected = 0, approvedDays = 0;
+      const tbody = document.getElementById('employeeHistoryTable');
+      tbody.innerHTML = '';
+
+      if (myReqs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500 font-medium">No leave requests submitted yet.</td></tr>`;
+      } else {
+        myReqs.forEach(req => {
+          const status = (req.status || 'PENDING').toUpperCase();
+          const daysCount = parseInt(req.days || 1, 10);
+
+          if (status === 'APPROVED') { approved++; approvedDays += daysCount; }
+          else if (status === 'REJECTED') { rejected++; }
+          else { pending++; }
+
+          const badgeColor = status === 'APPROVED' ? 'bg-emerald-900/50 text-emerald-400 border-emerald-700' :
+                             status === 'REJECTED' ? 'bg-rose-900/50 text-rose-400 border-rose-700' :
+                             'bg-amber-900/50 text-amber-400 border-amber-700';
+
+          const startDate = req.start_date || req.from_date || '—';
+          const endDate = req.end_date || req.to_date || '—';
+
+          tbody.innerHTML += `
+            <tr class="hover:bg-slate-800/50 transition">
+              <td class="p-3 font-medium text-slate-200">${startDate} to ${endDate}</td>
+              <td class="p-3 text-slate-300">${daysCount} day(s)</td>
+              <td class="p-3 text-slate-300">${req.reason || '—'}</td>
+              <td class="p-3">
+                <span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeColor}">
+                  ${status}
+                </span>
+              </td>
+              <td class="p-3 text-slate-400 italic">${req.feedback || '—'}</td>
+            </tr>
+          `;
+        });
+      }
+
+      document.getElementById('balanceDays').textContent = `${Math.max(0, 20 - approvedDays)} Days`;
+      document.getElementById('pendingCount').textContent = pending;
+      document.getElementById('approvedCount').textContent = approved;
+      document.getElementById('rejectedCount').textContent = rejected;
     }
 
-    // Submit Request with Dual Sync
+    // Submit Request Action
     async function submitLeaveRequest(e) {
       e.preventDefault();
       const startDate = document.getElementById('startDate').value;
       const endDate = document.getElementById('endDate').value;
       const reason = document.getElementById('reason').value;
 
-      const uId = currentUser.id || currentUser.user_id || currentUser._id || currentUser.email;
-      const empName = currentUser.full_name || currentUser.name || currentUser.username || currentUser.email;
-
+      const start = new Date(startDate);
+      const end = new Date(endDate);
       let days = 1;
-      if (startDate && endDate) {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        const diffDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
-        if (!isNaN(diffDays) && diffDays > 0) days = diffDays;
+      if (!isNaN(start) && !isNaN(end)) {
+        const diffTime = Math.abs(end - start);
+        days = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
       }
 
-      const generatedId = "req_" + Date.now();
+      const reqId = "req_" + Date.now();
+      const empName = currentUser?.full_name || currentUser?.name || currentUser?.email || "Employee";
 
-      const payload = {
-        id: generatedId,
-        _id: generatedId,
-        user_id: uId,
-        employee_id: uId,
+      const newRequest = {
+        id: reqId,
+        _id: reqId,
+        user_id: currentUser?.id || currentUser?.email || "emp_1",
+        employee_id: currentUser?.id || currentUser?.email || "emp_1",
         employee_name: empName,
         user_name: empName,
         name: empName,
-        email: currentUser.email,
+        email: currentUser?.email || "",
         start_date: startDate,
         end_date: endDate,
         from_date: startDate,
         to_date: endDate,
         reason: reason,
         days: days,
-        status: "PENDING"
+        status: "PENDING",
+        feedback: "—"
       };
 
-      // Always save locally immediately so user sees it
-      saveLocalRequest(payload);
+      saveStoredRequest(newRequest);
+
+      document.getElementById('startDate').value = '';
+      document.getElementById('endDate').value = '';
+      document.getElementById('reason').value = '';
+
+      showToast("Leave request submitted successfully!", true);
+      await loadEmployeeData();
 
       try {
         await fetch(`${API_BASE}/leave-requests`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(newRequest)
         });
       } catch (err) {
-        console.warn("Backend failed to respond, kept local copy", err);
+        console.warn("Backend API sync failed, kept in local state", err);
       }
-
-      showToast("Leave request submitted successfully!", true);
-      document.getElementById('startDate').value = '';
-      document.getElementById('endDate').value = '';
-      document.getElementById('reason').value = '';
-      
-      // Refresh UI instantly
-      await loadEmployeeData();
     }
 
-    // Load Manager Data
+    // Manager Dashboard Loader
     async function loadManagerData() {
-      try {
-        const requests = await fetchAllLeaveRequests();
-        const tableBody = document.getElementById('managerRequestsTable');
-        tableBody.innerHTML = '';
+      const allReqs = await getAllRequests();
+      const tbody = document.getElementById('managerRequestsTable');
+      tbody.innerHTML = '';
 
-        if (requests.length === 0) {
-          tableBody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No leave requests submitted yet.</td></tr>`;
-          return;
-        }
-
-        requests.forEach(req => {
-          const status = (req.status || 'PENDING').toUpperCase();
-          const badgeColor = status === 'APPROVED' ? 'bg-emerald-900/50 text-emerald-400 border-emerald-700' :
-                             status === 'REJECTED' ? 'bg-rose-900/50 text-rose-400 border-rose-700' :
-                             'bg-amber-900/50 text-amber-400 border-amber-700';
-
-          const reqId = String(req.id || req._id);
-          const empName = req.employee_name || req.user_name || req.name || req.email || req.user_id || 'Employee';
-          const startDate = req.start_date || req.from_date || '—';
-          const endDate = req.end_date || req.to_date || '—';
-          const daysCount = req.days || req.duration || 1;
-
-          const actionButtons = (status === 'PENDING') ? `
-            <div class="flex space-x-2">
-              <button onclick="updateStatus('${reqId}', 'APPROVED')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded text-xs font-bold transition">Approve</button>
-              <button onclick="updateStatus('${reqId}', 'REJECTED')" class="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1 rounded text-xs font-bold transition">Reject</button>
-            </div>
-          ` : `<span class="text-xs text-slate-500 font-semibold">Processed</span>`;
-
-          tableBody.innerHTML += `
-            <tr class="hover:bg-slate-800/50">
-              <td class="p-3 font-semibold text-slate-200">${empName}</td>
-              <td class="p-3">${startDate} to ${endDate}</td>
-              <td class="p-3">${daysCount} day(s)</td>
-              <td class="p-3">${req.reason || '—'}</td>
-              <td class="p-3">
-                <span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeColor}">
-                  ${status}
-                </span>
-              </td>
-              <td class="p-3">${actionButtons}</td>
-            </tr>
-          `;
-        });
-      } catch (err) {
-        showToast("Error loading manager dashboard", false);
+      if (allReqs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500 font-medium">No leave requests submitted yet.</td></tr>`;
+        return;
       }
+
+      allReqs.forEach(req => {
+        const status = (req.status || 'PENDING').toUpperCase();
+        const badgeColor = status === 'APPROVED' ? 'bg-emerald-900/50 text-emerald-400 border-emerald-700' :
+                           status === 'REJECTED' ? 'bg-rose-900/50 text-rose-400 border-rose-700' :
+                           'bg-amber-900/50 text-amber-400 border-amber-700';
+
+        const reqId = String(req.id || req._id);
+        const empName = req.employee_name || req.user_name || req.name || req.email || 'Employee';
+        const daysCount = req.days || 1;
+
+        const actionButtons = (status === 'PENDING') ? `
+          <div class="flex space-x-2">
+            <button onclick="updateStatus('${reqId}', 'APPROVED')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded text-xs font-bold transition">Approve</button>
+            <button onclick="updateStatus('${reqId}', 'REJECTED')" class="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1 rounded text-xs font-bold transition">Reject</button>
+          </div>
+        ` : `<span class="text-xs text-slate-500 font-semibold">Processed</span>`;
+
+        tbody.innerHTML += `
+          <tr class="hover:bg-slate-800/50 transition">
+            <td class="p-3 font-semibold text-slate-200">${empName}</td>
+            <td class="p-3 text-slate-300">${req.start_date || req.from_date} to ${req.end_date || req.to_date}</td>
+            <td class="p-3 text-slate-300">${daysCount} day(s)</td>
+            <td class="p-3 text-slate-300">${req.reason || '—'}</td>
+            <td class="p-3">
+              <span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeColor}">
+                ${status}
+              </span>
+            </td>
+            <td class="p-3">${actionButtons}</td>
+          </tr>
+        `;
+      });
     }
 
-    // Manager Action Handler with Dual Sync
+    // Manager Action Update
     async function updateStatus(requestId, status) {
-      let feedback = "";
+      let feedback = "—";
       if (status === 'REJECTED') {
         feedback = prompt("Provide feedback/reason for rejection:") || "No reason provided";
       }
 
-      updateLocalRequest(requestId, status, feedback);
+      updateStoredRequest(requestId, status, feedback);
 
       try {
         await fetch(`${API_BASE}/leave-requests/${requestId}`, {
@@ -566,11 +559,11 @@
           body: JSON.stringify({ status, feedback })
         });
       } catch (err) {
-        console.warn("Backend update failed, updated locally", err);
+        console.warn("Backend update error, updated locally", err);
       }
 
       showToast(`Request ${status.toLowerCase()} successfully!`, true);
-      loadManagerData();
+      await loadManagerData();
     }
   </script>
 </body>
